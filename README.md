@@ -9,3 +9,7 @@ attiny85 should implement:
 - configurable powercycle delay
 - power on after a given period
 - power off on request 
+
+
+External links
+https://randomnerdtutorials.com/latching-power-switch-circuit-auto-power-off-circuit-esp32-esp8266-arduino/
