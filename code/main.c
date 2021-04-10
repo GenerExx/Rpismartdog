@@ -37,10 +37,10 @@ extern char* USI_Slave_register_buffer[];
 // timer2 - zegar mierzący po jakim okresie włączyć zasilanie
 // timer3 - zegar mierzący czas zwłoki po jakim WDG się sam włączy
 
-#define WDG_DEFAULT_TIMER0   30
-#define WDG_DEFAULT_TIMER1   10
-#define WDG_DEFAULT_TIMER2   3600
-#define WDG_DEFAULT_TIMER3   120
+#define WDG_DEFAULT_TIMER0   30 * 10
+#define WDG_DEFAULT_TIMER1   10 * 10
+#define WDG_DEFAULT_TIMER2   3600 * 10
+#define WDG_DEFAULT_TIMER3   120 * 10
 
 
 volatile short int WDG_REG_COMMAND;
@@ -71,18 +71,18 @@ void setup() {
   USI_Slave_register_buffer[8] = (unsigned char*)(&WDG_REG_TIMER2);
 	USI_Slave_register_buffer[9] = (unsigned char*)(&WDG_REG_TIMER2)+1;
 
-  WDG_REG_TIMER0 = WDG_DEFAULT_TIMER0 * 10;
-  WDG_REG_TIMER1 = WDG_DEFAULT_TIMER1 * 10;
-  WDG_REG_TIMER2 = WDG_DEFAULT_TIMER2 * 10;
+  WDG_REG_TIMER0 = WDG_DEFAULT_TIMER0;
+  WDG_REG_TIMER1 = WDG_DEFAULT_TIMER1;
+  WDG_REG_TIMER2 = WDG_DEFAULT_TIMER2;
   timer0 = WDG_REG_TIMER0;
   timer1 = WDG_REG_TIMER1;
   timer2 = WDG_REG_TIMER2;
-  timer3 = WDG_DEFAULT_TIMER3 * 10;
+  timer3 = WDG_DEFAULT_TIMER3;
   WDG_REG_STATUS = WDG_STATUS_IDLE;
   sei();
 }
 
-
+//
 // W przerwaniach odliczamy czasu
 // przerwanie jest wywoływane raz na 100ms
 
@@ -92,9 +92,19 @@ ISR (TIMER1_OVF_vect)    // Timer1 ISR
     if (timer1 > 0 ) {timer1--;}
     if (timer2 > 0 ) {timer2--;}
 
-
-    
     TCNT1 = 63974;
+}
+
+//
+// Wyłacz zasilanie na wszystkich liniach
+//
+void Call_PowerDown(void) {
+
+
+}
+
+void Call_PowerUp(void) {
+
 }
 
 
@@ -130,8 +140,27 @@ main {
 //
         if ( WDG_REG_STATUS && WDG_STATUS_ACTIVE != 0 ) {
 
+// Sprawdź czy timer0 został wyzerowany.
+// Jeśli tak to WDG_CMD_REBOOT
 
+            if ( timer0 == 0 ) {
+                WDG_REG_STATUS = WDG_STATUS_REBOOTING;
+								timer2 = WDG_DEFAULT_TIMER2;
+								Call_PowerDown();
+						}
         }
+// Jeżeli status jest równy WDG_STATUS_REBOOTING, to sprawdź czy timer2
+// został wyzerowany. Jesli tak, to przywróć zasilanie.
+
+        if (WDG_REG_STATUS && WDG_STATUS_REBOOTING != 0 ) {
+            if ( timer2 == 0 ) {
+							  WDG_REG_STATUS = WDG_STATUS_ACTIVE;
+								timer0 = WDG_DEFAULT_TIMER0;
+								Call_PowerUp();
+						}
+
+				}
+
 //
 // Jednostką czasu jest jedna sekunda.
 //
