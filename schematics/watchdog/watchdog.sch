@@ -1,0 +1,226 @@
+EESchema Schematic File Version 4
+EELAYER 26 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L MCU_Microchip_ATtiny:ATtiny85-20PU U1
+U 1 1 606E0204
+P 4100 4800
+F 0 "U1" H 3570 4846 50  0000 R CNN
+F 1 "ATtiny85-20PU" H 3570 4755 50  0000 R CNN
+F 2 "Package_DIP:DIP-8_W7.62mm" H 4100 4800 50  0001 C CIN
+F 3 "http://ww1.microchip.com/downloads/en/DeviceDoc/atmel-2586-avr-8-bit-microcontroller-attiny25-attiny45-attiny85_datasheet.pdf" H 4100 4800 50  0001 C CNN
+	1    4100 4800
+	1    0    0    -1  
+$EndComp
+$Comp
+L Regulator_Linear:AMS1117 U?
+U 1 1 606E0662
+P 2750 2200
+F 0 "U?" H 2750 2442 50  0000 C CNN
+F 1 "AMS1117" H 2750 2351 50  0000 C CNN
+F 2 "Package_TO_SOT_SMD:SOT-223-3_TabPin2" H 2750 2400 50  0001 C CNN
+F 3 "http://www.advanced-monolithic.com/pdf/ds1117.pdf" H 2850 1950 50  0001 C CNN
+	1    2750 2200
+	1    0    0    -1  
+$EndComp
+$Comp
+L Transistor_BJT:2N2219 Q?
+U 1 1 606E0759
+P 5950 1950
+F 0 "Q?" H 6141 1996 50  0000 L CNN
+F 1 "2N2219" H 6141 1905 50  0000 L CNN
+F 2 "Package_TO_SOT_THT:TO-39-3" H 6150 1875 50  0001 L CIN
+F 3 "http://www.onsemi.com/pub_link/Collateral/2N2219-D.PDF" H 5950 1950 50  0001 L CNN
+	1    5950 1950
+	1    0    0    -1  
+$EndComp
+$Comp
+L Transistor_BJT:2N2219 Q?
+U 1 1 606E08CD
+P 5900 3100
+F 0 "Q?" H 6091 3146 50  0000 L CNN
+F 1 "2N2219" H 6091 3055 50  0000 L CNN
+F 2 "Package_TO_SOT_THT:TO-39-3" H 6100 3025 50  0001 L CIN
+F 3 "http://www.onsemi.com/pub_link/Collateral/2N2219-D.PDF" H 5900 3100 50  0001 L CNN
+	1    5900 3100
+	1    0    0    -1  
+$EndComp
+$Comp
+L Transistor_FET:IRF4905 Q?
+U 1 1 606E0D28
+P 6450 3500
+F 0 "Q?" H 6656 3546 50  0000 L CNN
+F 1 "IRF4905" H 6656 3455 50  0000 L CNN
+F 2 "Package_TO_SOT_THT:TO-220-3_Vertical" H 6650 3425 50  0001 L CIN
+F 3 "http://www.infineon.com/dgdl/irf4905.pdf?fileId=5546d462533600a4015355e32165197c" H 6450 3500 50  0001 L CNN
+	1    6450 3500
+	1    0    0    -1  
+$EndComp
+$Comp
+L Transistor_FET:IRF4905 Q?
+U 1 1 606E0E13
+P 6450 2400
+F 0 "Q?" H 6656 2446 50  0000 L CNN
+F 1 "IRF4905" H 6656 2355 50  0000 L CNN
+F 2 "Package_TO_SOT_THT:TO-220-3_Vertical" H 6650 2325 50  0001 L CIN
+F 3 "http://www.infineon.com/dgdl/irf4905.pdf?fileId=5546d462533600a4015355e32165197c" H 6450 2400 50  0001 L CNN
+	1    6450 2400
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x02_Male J2
+U 1 1 606E448F
+P 7750 2750
+F 0 "J2" H 7856 2928 50  0000 C CNN
+F 1 "power_in" H 7856 2837 50  0000 C CNN
+F 2 "" H 7750 2750 50  0001 C CNN
+F 3 "~" H 7750 2750 50  0001 C CNN
+	1    7750 2750
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR?
+U 1 1 606E4660
+P 1900 2500
+F 0 "#PWR?" H 1900 2250 50  0001 C CNN
+F 1 "GND" H 1905 2327 50  0000 C CNN
+F 2 "" H 1900 2500 50  0001 C CNN
+F 3 "" H 1900 2500 50  0001 C CNN
+	1    1900 2500
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:+5V #PWR?
+U 1 1 606E46A9
+P 2200 2200
+F 0 "#PWR?" H 2200 2050 50  0001 C CNN
+F 1 "+5V" H 2215 2373 50  0000 C CNN
+F 2 "" H 2200 2200 50  0001 C CNN
+F 3 "" H 2200 2200 50  0001 C CNN
+	1    2200 2200
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:VCC #PWR?
+U 1 1 606E4A9A
+P 3350 2200
+F 0 "#PWR?" H 3350 2050 50  0001 C CNN
+F 1 "VCC" H 3367 2373 50  0000 C CNN
+F 2 "" H 3350 2200 50  0001 C CNN
+F 3 "" H 3350 2200 50  0001 C CNN
+	1    3350 2200
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x02_Male J3
+U 1 1 606E4B32
+P 7750 2250
+F 0 "J3" H 7856 2428 50  0000 C CNN
+F 1 "power_out_5v" H 7856 2337 50  0000 C CNN
+F 2 "" H 7750 2250 50  0001 C CNN
+F 3 "~" H 7750 2250 50  0001 C CNN
+	1    7750 2250
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x02_Male J1
+U 1 1 606E4BAB
+P 7750 3150
+F 0 "J1" H 7856 3328 50  0000 C CNN
+F 1 "i2c" H 7856 3237 50  0000 C CNN
+F 2 "" H 7750 3150 50  0001 C CNN
+F 3 "~" H 7750 3150 50  0001 C CNN
+	1    7750 3150
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:Conn_01x02_Male J4
+U 1 1 606E4C25
+P 7750 1750
+F 0 "J4" H 7856 1928 50  0000 C CNN
+F 1 "power_out_3v" H 7856 1837 50  0000 C CNN
+F 2 "" H 7750 1750 50  0001 C CNN
+F 3 "~" H 7750 1750 50  0001 C CNN
+	1    7750 1750
+	1    0    0    -1  
+$EndComp
+Text GLabel 8400 3500 0    50   Input ~ 0
+CLK
+Text GLabel 8400 3350 0    50   Input ~ 0
+DAT
+Text GLabel 8600 3000 0    50   Input ~ 0
+VIN
+Text GLabel 8600 2750 0    50   Input ~ 0
+O5V
+Text GLabel 8600 2600 0    50   Input ~ 0
+O3V
+Text GLabel 8600 2400 0    50   Input ~ 0
+GND
+$Comp
+L Connector:Conn_01x02_Male J5
+U 1 1 606E5145
+P 7750 1150
+F 0 "J5" H 7856 1328 50  0000 C CNN
+F 1 "signal" H 7856 1237 50  0000 C CNN
+F 2 "" H 7750 1150 50  0001 C CNN
+F 3 "~" H 7750 1150 50  0001 C CNN
+	1    7750 1150
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR?
+U 1 1 606E5420
+P 4100 5400
+F 0 "#PWR?" H 4100 5150 50  0001 C CNN
+F 1 "GND" H 4105 5227 50  0000 C CNN
+F 2 "" H 4100 5400 50  0001 C CNN
+F 3 "" H 4100 5400 50  0001 C CNN
+	1    4100 5400
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:VCC #PWR?
+U 1 1 606E54B7
+P 4100 4200
+F 0 "#PWR?" H 4100 4050 50  0001 C CNN
+F 1 "VCC" H 4117 4373 50  0000 C CNN
+F 2 "" H 4100 4200 50  0001 C CNN
+F 3 "" H 4100 4200 50  0001 C CNN
+	1    4100 4200
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:VCC #PWR?
+U 1 1 606E557E
+P 3050 2200
+F 0 "#PWR?" H 3050 2050 50  0001 C CNN
+F 1 "VCC" H 3067 2373 50  0000 C CNN
+F 2 "" H 3050 2200 50  0001 C CNN
+F 3 "" H 3050 2200 50  0001 C CNN
+	1    3050 2200
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR?
+U 1 1 606E55C8
+P 2750 2500
+F 0 "#PWR?" H 2750 2250 50  0001 C CNN
+F 1 "GND" H 2755 2327 50  0000 C CNN
+F 2 "" H 2750 2500 50  0001 C CNN
+F 3 "" H 2750 2500 50  0001 C CNN
+	1    2750 2500
+	1    0    0    -1  
+$EndComp
+$EndSCHEMATC
