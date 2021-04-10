@@ -9,3 +9,11 @@ attiny85 should implement:
 - configurable powercycle delay
 - power on after a given period
 - power off on request 
+
+
+External links
+mosfet
+- https://randomnerdtutorials.com/latching-power-switch-circuit-auto-power-off-circuit-esp32-esp8266-arduino/
+
+i2c driver
+- https://github.com/JDat/AtTiny-I2C-master-slave-USI
