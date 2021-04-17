@@ -5,7 +5,20 @@
  *      Author: Pawel Tanski
  */
 
-#define F_CPU 8000000UL
+ // ATMEL ATTINY85
+ //
+ //                   +-\/-+
+ //      reset  PB5  1|    |8  VCC
+ //             PB3  2|    |7  PB2  SCL
+ //             PB4  3|    |6  PB1
+ //             GND  4|    |5  PB0  SDA
+ //                   +----+
+ //
+
+// PORTB &= ~(1 << PD0); // PD0 goes low
+// PORTB |= (1 << PD0); // PD0 goes high
+
+#define F_CPU 1000000UL
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -30,6 +43,7 @@ extern char* USI_Slave_register_buffer[];
 #define WDG_CMD_LINE1_ON     0x07
 #define WDG_CMD_LINE2_OFF    0x08
 #define WDG_CMD_LINE2_ON     0x09
+#define WDG_CMD_STORE		     0x0A
 
 
 // timer0 - główny zegar watchdoga
@@ -39,7 +53,7 @@ extern char* USI_Slave_register_buffer[];
 
 #define WDG_DEFAULT_TIMER0   30 * 10
 #define WDG_DEFAULT_TIMER1   10 * 10
-#define WDG_DEFAULT_TIMER2   3600 * 10
+#define WDG_DEFAULT_TIMER2   (unsigned int) 3600 * 10
 #define WDG_DEFAULT_TIMER3   120 * 10
 
 
@@ -51,25 +65,37 @@ volatile unsigned int WDG_REG_TIMER0;
 volatile unsigned int WDG_REG_TIMER1;
 volatile unsigned int WDG_REG_TIMER2;
 
-unsigned int timer0, timer1, timer2;
+unsigned int timer0, timer1, timer2, timer3;
 
 void setup() {
 
-	DDRB  = 0b00000000; // all inputs
-	PORTB = 0b00011010; // internal pull-ups on
+
+//  |  7  |  6  |  5  |  4  |  3  |  2  |  1  |  0  |
+//  | ... | ... | PB5 | PB4 | PB3 | PB2 | PB1 | PB0 |
+//
+// Inputs:
+// PB0 - SDA
+// PB2 - SCL
+//
+// Outputs:
+// PB3 - 5.0 V
+// PB4 - 3.3 V
+
+	DDRB  = 0b00011000; //
+	PORTB = 0b00000101; // internal pull-ups on
 
 	cli();
 	USI_I2C_Init(0x33);
-	USI_Slave_register_buffer[0] = (unsigned char*)(&WDG_REG_COMMAND);
-	USI_Slave_register_buffer[1] = (unsigned char*)(&WDG_REG_CONFIG);
-	USI_Slave_register_buffer[2] = (unsigned char*)(&WDG_REG_STATUS);
-	USI_Slave_register_buffer[3] = (unsigned char*)(&WDG_REG_RESERVED);
-  USI_Slave_register_buffer[4] = (unsigned char*)(&WDG_REG_TIMER0);
-	USI_Slave_register_buffer[5] = (unsigned char*)(&WDG_REG_TIMER0)+1;
-  USI_Slave_register_buffer[6] = (unsigned char*)(&WDG_REG_TIMER1);
-	USI_Slave_register_buffer[7] = (unsigned char*)(&WDG_REG_TIMER1)+1;
-  USI_Slave_register_buffer[8] = (unsigned char*)(&WDG_REG_TIMER2);
-	USI_Slave_register_buffer[9] = (unsigned char*)(&WDG_REG_TIMER2)+1;
+	USI_Slave_register_buffer[0] = (char*)(&WDG_REG_COMMAND);
+	USI_Slave_register_buffer[1] = (char*)(&WDG_REG_CONFIG);
+	USI_Slave_register_buffer[2] = (char*)(&WDG_REG_STATUS);
+	USI_Slave_register_buffer[3] = (char*)(&WDG_REG_RESERVED);
+    USI_Slave_register_buffer[4] = (char*)(&WDG_REG_TIMER0);
+	USI_Slave_register_buffer[5] = (char*)(&WDG_REG_TIMER0)+1;
+    USI_Slave_register_buffer[6] = (char*)(&WDG_REG_TIMER1);
+	USI_Slave_register_buffer[7] = (char*)(&WDG_REG_TIMER1)+1;
+    USI_Slave_register_buffer[8] = (char*)(&WDG_REG_TIMER2);
+	USI_Slave_register_buffer[9] = (char*)(&WDG_REG_TIMER2)+1;
 
   WDG_REG_TIMER0 = WDG_DEFAULT_TIMER0;
   WDG_REG_TIMER1 = WDG_DEFAULT_TIMER1;
@@ -88,7 +114,7 @@ void setup() {
 
 ISR (TIMER1_OVF_vect)    // Timer1 ISR
 {
-	  if (timer0 > 0 ) {timer0--;}
+    if (timer0 > 0 ) {timer0--;}
     if (timer1 > 0 ) {timer1--;}
     if (timer2 > 0 ) {timer2--;}
 
@@ -100,16 +126,18 @@ ISR (TIMER1_OVF_vect)    // Timer1 ISR
 //
 void Call_PowerDown(void) {
 
-
+    PORTB |= (1 << PB3) | (1 << PB4);
 }
 
 void Call_PowerUp(void) {
 
+    PORTB &= ~((1 << PB3) | (1 << PB4));
+
 }
 
 
 
-main {
+int main(void) {
 
     int command;
 
@@ -119,7 +147,7 @@ main {
 
 // Jeśli wpisano coś do rejestru COMMAND, to wykonaj odpowiednią procedurę.
 
-        if ( WDG_REG_COMMAND != WGD_CMD_NOP ) {
+        if ( WDG_REG_COMMAND != WDG_CMD_NOP ) {
             command = WDG_REG_COMMAND;
             switch (command) {
 
@@ -131,9 +159,9 @@ main {
                     WDG_REG_COMMAND = WDG_CMD_NOP;
                     timer0 = WDG_REG_TIMER0*10;
                     break;
-                }
             }
         }
+
 //
 // Jeżeli watchdog jest włączony, to okresowo zmniejszaj licznik.
 // Jeśli licznik się wyzeruje, to reboot.
@@ -164,6 +192,7 @@ main {
 //
 // Jednostką czasu jest jedna sekunda.
 //
-        delay(1000)
+  //      delay(1000);
+		}
 
-    }
+}
