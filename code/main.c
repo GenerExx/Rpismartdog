@@ -80,6 +80,7 @@ void setup() {
 // Outputs:
 // PB3 - 5.0 V
 // PB4 - 3.3 V
+// PB1 - 3.3 V
 
 	DDRB  = 0b00011000; //
 	PORTB = 0b00000101; // internal pull-ups on
@@ -188,6 +189,15 @@ int main(void) {
 						}
 
 				}
+
+// Enter low power mode.
+//            enable_pcie();
+//           set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+//            sleep_mode();
+//            disable_pcie();
+//            state = STATE_IDLE1;
+//           break;
+
 
 //
 // Jednostką czasu jest jedna sekunda.
