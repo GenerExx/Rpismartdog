@@ -9,8 +9,8 @@
  //
  //                   +-\/-+
  //      reset  PB5  1|    |8  VCC
- //             PB3  2|    |7  PB2  SCL
- //             PB4  3|    |6  PB1
+ //       O5V   PB3  2|    |7  PB2  SCL
+ //       O3V   PB4  3|    |6  PB1  LED
  //             GND  4|    |5  PB0  SDA
  //                   +----+
  //
@@ -23,6 +23,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/sleep.h>
+
 #include "usi_i2c_slave.h"
 
 extern char* USI_Slave_register_buffer[];
@@ -46,13 +47,13 @@ extern char* USI_Slave_register_buffer[];
 // timer2 - zegar mierzący po jakim okresie włączyć zasilanie
 // timer3 - zegar mierzący czas zwłoki po jakim WDG się aktywuje
 
-#define WDG_DEFAULT_TIMER0   (unsigned int) 30 * 10
-#define WDG_DEFAULT_TIMER1   (unsigned int) 5 * 10
-#define WDG_DEFAULT_TIMER2   (unsigned int) 3600 * 10
-#define WDG_DEFAULT_TIMER3   (unsigned int) 600 * 10
+#define WDG_DEFAULT_TIMER0   (unsigned int) 120
+#define WDG_DEFAULT_TIMER1   (unsigned int) 10
+#define WDG_DEFAULT_TIMER2   (unsigned int) 3600
+#define WDG_DEFAULT_TIMER3   (unsigned int) 600
 
 #define WDG_O5V_Line  PB3
-#define WDG_O3V_Line  PB1
+#define WDG_O3V_Line  PB4
 
 
 volatile short int WDG_REG_COMMAND;
@@ -67,21 +68,12 @@ volatile unsigned int WDG_REG_TIMER3;
 
 unsigned int timer0, timer1, timer2, timer3;
 
-enum flashspeed {slow = 0, normal, fast };
-
-unsigned int LEDParams[2][1] = {{99, 1}, {50, 50}, {5, 5} };
-
-
 void Load_Defaults(void) {
 
     WDG_REG_TIMER0 = WDG_DEFAULT_TIMER0;
     WDG_REG_TIMER1 = WDG_DEFAULT_TIMER1;
     WDG_REG_TIMER2 = WDG_DEFAULT_TIMER2;
     WDG_REG_TIMER3 = WDG_DEFAULT_TIMER3;
-//	  timer0 = WDG_DEFAULT_TIMER0;
-//	  timer1 = WDG_DEFAULT_TIMER1;
-//	  timer2 = WDG_DEFAULT_TIMER2;
-//	  timer3 = WDG_DEFAULT_TIMER3;
     timer0 = 0;
     timer1 = 0;
     timer2 = 0;
@@ -94,7 +86,53 @@ void Store_Defaults(void) {
 
 }
 
-void setup() {
+void Timer0_Setup(void){
+    cli();
+// Clear registers
+    TCCR0A = 0;
+    TCCR0B = 0;
+    TCNT0 = 0;
+// 10.067654639175258 Hz (1000000/((96+1)*1024))
+    OCR0A = 96;
+
+// Dla 100Hz
+    OCR0A = 155;
+/*
+    TCCR0A - Timer/Counter Control Register A
+    7:6 - [COM0A] - Compare Match Output A mode
+    5:4 - [COM0B] - Compare Match Output B Mode
+    3:2 - Reserved
+    1:0 - [WGM01,WGM00] Waveform Generation Mode
+
+    Set CTC Mode
+    WGM02, WGM01, WGM00 = 0 1 0 = CTC Mode - Top = OCRA;
+    Registers:
+    TCCR0A, TCCR0B
+*/
+    TCCR0A &= ~(1 << WGM00);
+    TCCR0A |=  (1 << WGM01);
+    TCCR0B &= ~(1 << WGM02);
+/*
+    TCCR0B
+    7:6 - [FOC0A, FOC0B] - Force Output Compare B
+    5:4 - Reserved
+    3   - [WGM02] - Waveform Generation mode
+    2:0 - [CS] - Clock Select
+
+    CS02, CS01, CS00 = 1 0 0 = Clkio/1024
+
+    Set prescaler=1024
+*/
+//    TCCR0B &= ~(1 << CS01);
+//    TCCR0B |= (1 << CS02) | (1 << CS00);
+
+//  Prescaler = 64 - dla 100 Hz
+    TCCR0B |= ( 1 << CS01 ) | ( 1 << CS00 );
+
+// Output Compare Match A Interrupt Enable
+    TIMSK |= (1 << OCIE0A);
+    sei();
+}
 
 /*
 //  |  7  |  6  |  5  |  4  |  3  |  2  |  1  |  0  |
@@ -109,44 +147,77 @@ void setup() {
 // PB4 - 3.3 V
 // PB1 - 3.3 V
 */
-	  DDRB  = 0b00011000; //
-	  PORTB = 0b00000101; // internal pull-ups on
-
+void setup() {
+	DDRB  = 0b00011000; //
+	PORTB = 0b00000101; // internal pull-ups on
     Load_Defaults();
+    WDG_REG_STATUS = 0x00;
   	cli();
-	  USI_I2C_Init(0x33);
-	  USI_Slave_register_buffer[0] = (char*)(&WDG_REG_COMMAND);
-	  USI_Slave_register_buffer[1] = (char*)(&WDG_REG_CONFIG);
-	  USI_Slave_register_buffer[2] = (char*)(&WDG_REG_STATUS);
-	  USI_Slave_register_buffer[3] = (char*)(&WDG_REG_RESERVED);
+    USI_I2C_Init(0x33);
+    USI_Slave_register_buffer[0] = (char*)(&WDG_REG_COMMAND);
+    USI_Slave_register_buffer[1] = (char*)(&WDG_REG_CONFIG);
+    USI_Slave_register_buffer[2] = (char*)(&WDG_REG_STATUS);
+    USI_Slave_register_buffer[3] = (char*)(&WDG_REG_RESERVED);
     USI_Slave_register_buffer[4] = (char*)(&WDG_REG_TIMER0);
-	  USI_Slave_register_buffer[5] = (char*)(&WDG_REG_TIMER0)+1;
+    USI_Slave_register_buffer[5] = (char*)(&WDG_REG_TIMER0)+1;
     USI_Slave_register_buffer[6] = (char*)(&WDG_REG_TIMER1);
-	  USI_Slave_register_buffer[7] = (char*)(&WDG_REG_TIMER1)+1;
+    USI_Slave_register_buffer[7] = (char*)(&WDG_REG_TIMER1)+1;
     USI_Slave_register_buffer[8] = (char*)(&WDG_REG_TIMER2);
-	  USI_Slave_register_buffer[9] = (char*)(&WDG_REG_TIMER2)+1;
+    USI_Slave_register_buffer[9] = (char*)(&WDG_REG_TIMER2)+1;
     USI_Slave_register_buffer[10] = (char*)(&WDG_REG_TIMER3);
     USI_Slave_register_buffer[11] = (char*)(&WDG_REG_TIMER3)+1;
-
     WDG_REG_STATUS = 0;
+    WDG_REG_COMMAND = 0;
     sei();
 }
 
-//
-// W przerwaniach odliczamy czasu
-// przerwanie jest wywoływane raz na 100ms
-
-ISR (TIMER1_OVF_vect)    // Timer1 ISR
-{
-    if (timer0 > 0 ) {timer0--;}
-    if (timer1 > 0 ) {timer1--;}
-    if (timer2 > 0 ) {timer2--;}
-    if (timer3 > 0 ) {timer3--;}
+int LedOn;
+int LedTimer;
+int LedHTime, LedLTime;
 
 
-// to jeszcze do zweryfikowania;
-    TCNT1 = 63974;
+ISR (TIMER0_COMPA_vect) {
+    if (LedTimer > 0) {LedTimer--;}
+    if (LedTimer == 0){
+        LedOn = 1 - LedOn;
+        PORTB ^= ( 1 << PB1 );
+        if ( LedOn == 1 ) {
+            LedTimer = LedHTime;
+        } else {
+            LedTimer = LedLTime;
+        }
+    }
 }
+
+
+void Timer1_Setup() {
+  cli();
+  // Clear registers
+  TCNT1 = 0;
+  TCCR1 = 0;
+
+  // 1.0005763319672132 Hz (1000000/((243+1)*4096))
+  OCR1C = 243;
+  // interrupt COMPA
+  OCR1A = OCR1C;
+  // CTC
+  TCCR1 |= (1 << CTC1);
+  // Prescaler 4096
+  TCCR1 |= (1 << CS13) | (1 << CS12) | (1 << CS10);
+  // Output Compare Match A Interrupt Enable
+  TIMSK |= (1 << OCIE1A);
+  sei();
+}
+
+
+ISR(TIMER1_COMPA_vect) {
+    if (timer0 > 0 ) {timer0--;};
+    if (timer1 > 0 ) {timer1--;};
+    if (timer2 > 0 ) {timer2--;};
+    if (timer3 > 0 ) {timer3--;};
+}
+
+
 
 void Exec_Line5_Down(void) { PORTB |= (1 << WDG_O5V_Line); }
 void Exec_Line3_Down(void) { PORTB |= (1 << WDG_O3V_Line); }
@@ -154,20 +225,25 @@ void Exec_Line5_Up(void) { PORTB &= ~(1 << WDG_O5V_Line); }
 void Exec_Line3_Up(void) { PORTB &= ~(1 << WDG_O3V_Line); }
 
 void Exec_PowerDown(void) {
-    Exec_Line3_Down();
-    Exec_Line5_Down();
+ //   Exec_Line3_Down();
+ //   Exec_Line5_Down();
 }
 
 void Exec_PowerUp(void) {
-    Exec_Line3_Up();
-    Exec_Line5_Up();
+ //   Exec_Line3_Up();
+ //   Exec_Line5_Up();
 }
 
 int main(void) {
 
     int command;
-
+    int temp;
     setup();
+    Timer0_Setup();
+    Timer1_Setup();
+    LedOn = 0;
+    LedHTime = 25;
+    LedLTime = 25;
 
     while (1) {
 
@@ -175,54 +251,65 @@ int main(void) {
             command = WDG_REG_COMMAND;
             switch (command) {
 
-                    case WDG_CMD_BOOTCOMPLETE:
-                        timer3 = 0;
-                        timer0 = WDG_REG_TIMER0;
-                        WDG_REG_STATUS |= WDG_STATUS_ACTIVE;
-                        break;
+                case WDG_CMD_BOOTCOMPLETE:
+                    timer3 = 0;
+                    timer0 = WDG_REG_TIMER0;
+                    WDG_REG_STATUS |= WDG_STATUS_ACTIVE;
+                    break;
 
-                    case WDG_CMD_KEEPALIVE:
-                        timer0 = WDG_REG_TIMER0;
-                        break;
+                case WDG_CMD_KEEPALIVE:
+                    timer0 = WDG_REG_TIMER0;
+                    break;
 
-                    case WDG_CMD_POWEROFF:
-                        Exec_PowerDown();
-                        timer2 = WDG_REG_TIMER2;
-                        WDG_REG_STATUS |= WDG_STATUS_POWEROFF;
-                        break;
+                case WDG_CMD_POWEROFF:
+                    Exec_PowerDown();
+                    timer2 = WDG_REG_TIMER2;
+                    WDG_REG_STATUS |= WDG_STATUS_POWEROFF;
+                    break;
 
-                    case WDG_CMD_LINE3_ON:
-                        Exec_Line3_Up();
-                        break;
+                case WDG_CMD_LINE3_ON:
+                    Exec_Line3_Up();
+                    break;
 
-                    case WDG_CMD_LINE3_OFF:
-                        Exec_Line3_Down();
-                        break;
+                case WDG_CMD_LINE3_OFF:
+                    Exec_Line3_Down();
+                    break;
 
-                }
+            }
             WDG_REG_COMMAND = WDG_CMD_NOP;
         }
+
 /*
 // Sprawdź czy to pierwsze uruchomienie, tj. status jest 0.
 // Jeśli tak, to po wyzerowaniu timer3 ustaw status ACTIVE.
 // Od tego momentu, zerowanie timer0 będzie powodowało restart.
 */
-        if ( WDG_REG_STATUS && WDG_STATUS_ACTIVE == 0) {
+        if ( ( WDG_REG_STATUS & WDG_STATUS_ACTIVE ) != WDG_STATUS_ACTIVE ) {
             if ( timer3 == 0 ) {
                 timer0 = WDG_REG_TIMER0;
+                LedHTime = 3;
+                LedLTime = 197;
                 WDG_REG_STATUS |= WDG_STATUS_ACTIVE;
+                PORTB ^= ( 1 << PB3 );
             }
         }
 /*
 // Sprawdź czy timer0 został wyzerowany.
 // Jeśli tak to REBOOT, wyłacz MOSFETy i zacznij odliczać czas w timer1
 */
-        if ( WDG_REG_STATUS && WDG_STATUS_ACTIVE != 0 ) {
+
+// BUG - Status ACTIVE and NOT REBOOTING
+
+        if ( ( ( WDG_REG_STATUS & WDG_STATUS_ACTIVE ) == WDG_STATUS_ACTIVE ) &&
+           ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) != WDG_STATUS_REBOOTING ) ) {
             if ( timer0 == 0 ) {
                 timer1 = WDG_REG_TIMER1;
+                LedHTime = 5;
+                LedLTime = 5;
                 WDG_REG_STATUS |= WDG_STATUS_REBOOTING;
-								Exec_PowerDown();
-						}
+				Exec_PowerDown();
+				PORTB ^= ( 1 << PB3 );
+			}
         }
 /*
 // Jeżeli mamy status REBOOTING to czekamy aż timer1 się wyzeruje
@@ -230,14 +317,18 @@ int main(void) {
 // Dodatkowo, ustawiamy timer3 i zerujemy status ACTIVE.
 // Timer3 odlacza czas potrzebny na uruchomienie RPi.
 */
-        if ( WDG_REG_STATUS && WDG_STATUS_REBOOTING != 0 ) {
+
+        if ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) == WDG_STATUS_REBOOTING ) {
             if ( timer1 == 0 ) {
                 timer3 = WDG_REG_TIMER3;
+                LedHTime = 25;
+                LedLTime = 25;
                 WDG_REG_STATUS &= ~(WDG_STATUS_REBOOTING | WDG_STATUS_ACTIVE);
                 Exec_PowerUp();
+                PORTB ^= ( 1 << PB3 );
             }
         }
-
+/*
         if ( WDG_REG_STATUS && WDG_STATUS_POWEROFF != 0 ) {
             if ( timer2 == 0 ) {
                 timer3 = WDG_REG_TIMER3;
@@ -245,22 +336,13 @@ int main(void) {
                 Exec_PowerUp();
             }
         }
+*/
 
-/*
 // Enter low power mode.
-//            enable_pcie();
-//           set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-//            sleep_mode();
-//            disable_pcie();
-//            state = STATE_IDLE1;
-//           break;
-
-
-//
-// Jednostką czasu jest jedna sekunda.
-//
-  //      delay(1000);
-  */
-		}
+    //sei();
+        //set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+        //sleep_mode();
+    //cli();
+    }
 
 }
