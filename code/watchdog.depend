@@ -1,0 +1,11 @@
+# depslib dependency file v1.0
+1618688924 source:/home/blady/Rpismartdog/code/fuse.c
+	<avr/io.h>
+
+1618002512 source:/home/blady/Rpismartdog/code/usi_i2c_slave.c
+	"usi_i2c_slave.h"
+
+1617994608 /home/blady/Rpismartdog/code/usi_i2c_slave.h
+	<avr/io.h>
+	<avr/interrupt.h>
+
