@@ -25,14 +25,14 @@ char usi_i2c_mode;
 ////USI Slave States///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define USI_SLAVE_REGISTER_COUNT 10
+#define USI_SLAVE_REGISTER_COUNT 8
 
 // The I2C register file is stored as an array of pointers, point these to whatever your I2C registers
 // need to read/write in your code.  This abstracts the buffer and makes it easier to write directly
 // to values in your code.
-char* USI_Slave_register_buffer[USI_SLAVE_REGISTER_COUNT];
-char  USI_Slave_internal_address = 0;
-char  USI_Slave_internal_address_set = 0;
+unsigned char* USI_Slave_register_buffer[USI_SLAVE_REGISTER_COUNT];
+unsigned char  USI_Slave_internal_address = 0;
+unsigned char  USI_Slave_internal_address_set = 0;
 
 enum
 {
@@ -83,8 +83,6 @@ void USI_I2C_Init(char address)
 	USICR = (1 << USISIE) | (0 << USIOIE) | (1 << USIWM1) | (0 << USIWM0) | (1 << USICS1) | (0 << USICS0) | (0 << USICLK) | (0 << USITC);
 	USISR = (1 << USISIF) | (1 << USIOIF) | (1 << USIPF) | (1 << USIDC);
 
-//    PORTB|=_BV(PB1);
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -102,7 +100,7 @@ void USI_I2C_Init(char address)
 
 ISR(USI_START_vect)
 {
-    PORTB|=_BV(PB1);
+
 
 	USI_I2C_Slave_State = USI_SLAVE_CHECK_ADDRESS;
 
@@ -142,7 +140,6 @@ ISR(USI_START_vect)
 
 ISR(USI_OVF_vect)
 {
-
 	switch (USI_I2C_Slave_State)
 	{
 		/////////////////////////////////////////////////////////////////////////
@@ -159,7 +156,6 @@ ISR(USI_OVF_vect)
 
 			if((USIDR == 0) || ((USIDR >> 1) == usi_i2c_slave_address))
 			{
-				//PORTB ^= (1<<PB3); <- co to?????
 				if (USIDR & 0x01)
 				{
 					USI_I2C_Slave_State = USI_SLAVE_SEND_DATA;

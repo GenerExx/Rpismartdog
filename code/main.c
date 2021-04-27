@@ -23,23 +23,24 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/sleep.h>
-
+#include <avr/power.h>
 #include "usi_i2c_slave.h"
 
-extern char* USI_Slave_register_buffer[];
+extern unsigned char* USI_Slave_register_buffer[];
 
 // ACTIVE - czyli o tego momentu jak timer0 osiągnie 0 to reboot.
-#define WDG_STATUS_ACTIVE    0x01
-#define WDG_STATUS_REBOOTING 0x02
-#define WDG_STATUS_POWEROFF  0x04
+#define WDG_STATUS_ACTIVE       0x01
+#define WDG_STATUS_REBOOTING    0x02
+#define WDG_STATUS_POWEROFF     0x04
 
-#define WDG_CMD_NOP           0x00
-#define WDG_CMD_BOOTCOMPLETE  0x01
-#define WDG_CMD_KEEPALIVE     0x02
-#define WDG_CMD_POWEROFF      0x03
-#define WDG_CMD_LINE3_OFF     0x04
-#define WDG_CMD_LINE3_ON      0x05
-#define WDG_CMD_STOREDEFAULTS 0x06
+
+#define WDG_CMD_NOP             0x00
+#define WDG_CMD_BOOTCOMPLETE    0x01
+#define WDG_CMD_KEEPALIVE       0x02
+#define WDG_CMD_LINE3_OFF       0x03
+#define WDG_CMD_LINE3_ON        0x04
+#define WDG_CMD_STORE           0x05
+#define WDG_CMD_LOAD            0x06
 
 
 // timer0 - główny zegar watchdoga
@@ -47,9 +48,9 @@ extern char* USI_Slave_register_buffer[];
 // timer2 - zegar mierzący po jakim okresie włączyć zasilanie
 // timer3 - zegar mierzący czas zwłoki po jakim WDG się aktywuje
 
-#define WDG_DEFAULT_TIMER0   (unsigned int) 120
-#define WDG_DEFAULT_TIMER1   (unsigned int) 10
-#define WDG_DEFAULT_TIMER2   (unsigned int) 3600
+#define WDG_DEFAULT_TIMER0   (unsigned int) 60
+#define WDG_DEFAULT_TIMER1   (unsigned int) 5
+#define WDG_DEFAULT_TIMER2   (unsigned int) 21600 // 6 hrs
 #define WDG_DEFAULT_TIMER3   (unsigned int) 600
 
 #define WDG_O5V_Line  PB3
@@ -57,27 +58,19 @@ extern char* USI_Slave_register_buffer[];
 
 
 volatile short int WDG_REG_COMMAND;
-volatile short int WDG_REG_CONFIG;
 volatile short int WDG_REG_STATUS;
-volatile short int WDG_REG_RESERVED;
 volatile unsigned int WDG_REG_TIMER0;
 volatile unsigned int WDG_REG_TIMER1;
 volatile unsigned int WDG_REG_TIMER2;
 volatile unsigned int WDG_REG_TIMER3;
 
+unsigned short int timer0, timer1, timer4;
+unsigned int timer2, timer3;
+unsigned short int counter0;
 
-unsigned int timer0, timer1, timer2, timer3;
 
 void Load_Defaults(void) {
 
-    WDG_REG_TIMER0 = WDG_DEFAULT_TIMER0;
-    WDG_REG_TIMER1 = WDG_DEFAULT_TIMER1;
-    WDG_REG_TIMER2 = WDG_DEFAULT_TIMER2;
-    WDG_REG_TIMER3 = WDG_DEFAULT_TIMER3;
-    timer0 = 0;
-    timer1 = 0;
-    timer2 = 0;
-    timer3 = WDG_DEFAULT_TIMER3;
 
 }
 
@@ -148,43 +141,63 @@ void Timer0_Setup(void){
 // PB1 - 3.3 V
 */
 void setup() {
-	DDRB  = 0b00011000; //
-	PORTB = 0b00000101; // internal pull-ups on
-    Load_Defaults();
-    WDG_REG_STATUS = 0x00;
   	cli();
-    USI_I2C_Init(0x33);
-    USI_Slave_register_buffer[0] = (char*)(&WDG_REG_COMMAND);
-    USI_Slave_register_buffer[1] = (char*)(&WDG_REG_CONFIG);
-    USI_Slave_register_buffer[2] = (char*)(&WDG_REG_STATUS);
-    USI_Slave_register_buffer[3] = (char*)(&WDG_REG_RESERVED);
-    USI_Slave_register_buffer[4] = (char*)(&WDG_REG_TIMER0);
-    USI_Slave_register_buffer[5] = (char*)(&WDG_REG_TIMER0)+1;
-    USI_Slave_register_buffer[6] = (char*)(&WDG_REG_TIMER1);
-    USI_Slave_register_buffer[7] = (char*)(&WDG_REG_TIMER1)+1;
-    USI_Slave_register_buffer[8] = (char*)(&WDG_REG_TIMER2);
-    USI_Slave_register_buffer[9] = (char*)(&WDG_REG_TIMER2)+1;
-    USI_Slave_register_buffer[10] = (char*)(&WDG_REG_TIMER3);
-    USI_Slave_register_buffer[11] = (char*)(&WDG_REG_TIMER3)+1;
-    WDG_REG_STATUS = 0;
-    WDG_REG_COMMAND = 0;
+	DDRB  = 0b00011010; //
+	PORTB = 0b00000101; // internal pull-ups off
+    USI_I2C_Init(0x22);
+
+    USI_Slave_register_buffer[0] = (unsigned char*)(&WDG_REG_COMMAND);
+    USI_Slave_register_buffer[1] = (unsigned char*)(&WDG_REG_STATUS);
+    USI_Slave_register_buffer[2] = (unsigned char*)(&WDG_REG_TIMER0);
+    USI_Slave_register_buffer[3] = (unsigned char*)(&WDG_REG_TIMER1);
+    USI_Slave_register_buffer[4] = (unsigned char*)(&WDG_REG_TIMER2);
+    USI_Slave_register_buffer[5] = (unsigned char*)(&WDG_REG_TIMER2)+1;
+    USI_Slave_register_buffer[6] = (unsigned char*)(&WDG_REG_TIMER3);
+    USI_Slave_register_buffer[7] = (unsigned char*)(&WDG_REG_TIMER3)+1;
+
+    WDG_REG_STATUS = 0x00;
+    WDG_REG_COMMAND = 0x00;
+    WDG_REG_TIMER0 = WDG_DEFAULT_TIMER0;
+    WDG_REG_TIMER1 = WDG_DEFAULT_TIMER1;
+    WDG_REG_TIMER2 = WDG_DEFAULT_TIMER2;
+    WDG_REG_TIMER3 = WDG_DEFAULT_TIMER3;
+    timer0 = 0;
+    timer1 = 0;
+    timer2 = 0;
+    timer3 = WDG_DEFAULT_TIMER3;
+    timer4 = 0;
+    counter0 = 0;
     sei();
 }
 
 int LedOn;
 int LedTimer;
-int LedHTime, LedLTime;
 
+short int LedProfile1[8] = {1,99,1,99,1,99,1,99};
+short int LedProfile2[8] = {1,10,1,78,1,10,1,78};
+short int LedProfile3[8] = {3,7,3,7,3,7,3,7};
+short int LedProfile4[8] = {2,298,2,298,2,298,2,298};
+short int* LedProfile;
+short int LedIndex;
+
+void LedStartProfile(short int *params) {
+    LedOn = 0;
+    LedIndex = 0;
+    LedProfile = params;
+}
 
 ISR (TIMER0_COMPA_vect) {
     if (LedTimer > 0) {LedTimer--;}
     if (LedTimer == 0){
+
+        LedTimer = LedProfile[LedIndex];
+        LedIndex = ( LedIndex + 1 ) % 8;
         LedOn = 1 - LedOn;
-        PORTB ^= ( 1 << PB1 );
+
         if ( LedOn == 1 ) {
-            LedTimer = LedHTime;
+            PORTB |= ( 1 << PB1 );
         } else {
-            LedTimer = LedLTime;
+            PORTB &= ~( 1 << PB1 );
         }
     }
 }
@@ -215,8 +228,8 @@ ISR(TIMER1_COMPA_vect) {
     if (timer1 > 0 ) {timer1--;};
     if (timer2 > 0 ) {timer2--;};
     if (timer3 > 0 ) {timer3--;};
+    if (timer4 > 0 ) {timer4--;};
 }
-
 
 
 void Exec_Line5_Down(void) { PORTB |= (1 << WDG_O5V_Line); }
@@ -227,26 +240,52 @@ void Exec_Line3_Up(void) { PORTB &= ~(1 << WDG_O3V_Line); }
 void Exec_PowerDown(void) {
  //   Exec_Line3_Down();
  //   Exec_Line5_Down();
+     PORTB &= ~(1 << PB4);
 }
 
 void Exec_PowerUp(void) {
  //   Exec_Line3_Up();
  //   Exec_Line5_Up();
+     PORTB |= (1 << PB4);
 }
+
+
+void EEPROM_write(unsigned char ucAddress, unsigned char ucData) {
+    /* Wait for completion of previous write */
+    while(EECR & (1<<EEPE));
+    /* Set Programming mode */
+    EECR = (0<<EEPM1)|(0<<EEPM0);
+    /* Set up address and data registers */
+    EEAR = ucAddress;
+    EEDR = ucData;
+    /* Write logical one to EEMPE */
+    EECR |= (1<<EEMPE);
+    /* Start eeprom write by setting EEPE */
+    EECR |= (1<<EEPE);
+}
+
+unsigned char EEPROM_read(unsigned char ucAddress) {
+    /* Wait for completion of previous write */
+    while(EECR & (1<<EEPE));
+    /* Set up address register */
+    EEAR = ucAddress;
+    /* Start eeprom read by writing EERE */
+    EECR |= (1<<EERE);
+    /* Return data from data register */
+    return EEDR;
+}
+
 
 int main(void) {
 
     int command;
-    int temp;
     setup();
     Timer0_Setup();
     Timer1_Setup();
-    LedOn = 0;
-    LedHTime = 25;
-    LedLTime = 25;
+    LedStartProfile(LedProfile1);
 
     while (1) {
-
+        sei();
         if ( WDG_REG_COMMAND != WDG_CMD_NOP ) {
             command = WDG_REG_COMMAND;
             switch (command) {
@@ -259,12 +298,6 @@ int main(void) {
 
                 case WDG_CMD_KEEPALIVE:
                     timer0 = WDG_REG_TIMER0;
-                    break;
-
-                case WDG_CMD_POWEROFF:
-                    Exec_PowerDown();
-                    timer2 = WDG_REG_TIMER2;
-                    WDG_REG_STATUS |= WDG_STATUS_POWEROFF;
                     break;
 
                 case WDG_CMD_LINE3_ON:
@@ -287,10 +320,8 @@ int main(void) {
         if ( ( WDG_REG_STATUS & WDG_STATUS_ACTIVE ) != WDG_STATUS_ACTIVE ) {
             if ( timer3 == 0 ) {
                 timer0 = WDG_REG_TIMER0;
-                LedHTime = 3;
-                LedLTime = 197;
+                LedStartProfile(LedProfile2);
                 WDG_REG_STATUS |= WDG_STATUS_ACTIVE;
-                PORTB ^= ( 1 << PB3 );
             }
         }
 /*
@@ -304,11 +335,14 @@ int main(void) {
            ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) != WDG_STATUS_REBOOTING ) ) {
             if ( timer0 == 0 ) {
                 timer1 = WDG_REG_TIMER1;
-                LedHTime = 5;
-                LedLTime = 5;
+                LedStartProfile(LedProfile3);
                 WDG_REG_STATUS |= WDG_STATUS_REBOOTING;
 				Exec_PowerDown();
-				PORTB ^= ( 1 << PB3 );
+				if ( timer4 == 0 ) {
+                    timer4 = 1800; // 30 min. x 60 sec.
+                    counter0 = 0;
+				}
+				counter0++;
 			}
         }
 /*
@@ -317,32 +351,46 @@ int main(void) {
 // Dodatkowo, ustawiamy timer3 i zerujemy status ACTIVE.
 // Timer3 odlacza czas potrzebny na uruchomienie RPi.
 */
-
         if ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) == WDG_STATUS_REBOOTING ) {
             if ( timer1 == 0 ) {
                 timer3 = WDG_REG_TIMER3;
-                LedHTime = 25;
-                LedLTime = 25;
+                // przejście do stanu jak po pierwszym uruchomieniu
+                LedStartProfile(LedProfile1);
                 WDG_REG_STATUS &= ~(WDG_STATUS_REBOOTING | WDG_STATUS_ACTIVE);
                 Exec_PowerUp();
-                PORTB ^= ( 1 << PB3 );
             }
         }
 /*
-        if ( WDG_REG_STATUS && WDG_STATUS_POWEROFF != 0 ) {
+// Jeżeli w czasie odliczania timer4 liczba restartów jest większa od 4
+// to wyłącz zasilanie na kilka godzin (dzień?).
+// Nie ma sensu wachlować zasilaniem jak RPi nie wstaje.
+*/
+        if ( ( timer4 > 0 ) && ( counter0 >= 3 ) ) {
+            LedStartProfile(LedProfile4);
+            Exec_PowerDown();
+            WDG_REG_STATUS = WDG_STATUS_POWEROFF;
+            timer2 = WDG_DEFAULT_TIMER2;
+        }
+/*
+// Wyjście z trybu POWEROFF
+// Tak, wiem, warunki nie są napisane w c++ style, ale tak ma być
+*/
+        if ( ( WDG_REG_STATUS & WDG_STATUS_POWEROFF ) == WDG_STATUS_POWEROFF ) {
             if ( timer2 == 0 ) {
+                WDG_REG_STATUS &= ~( WDG_STATUS_ACTIVE | WDG_STATUS_POWEROFF | WDG_STATUS_REBOOTING );
                 timer3 = WDG_REG_TIMER3;
-                WDG_REG_STATUS &= ~(WDG_STATUS_POWEROFF | WDG_STATUS_ACTIVE);
+                // przejście do stanu jak po pierwszym uruchomieniu
+                LedStartProfile(LedProfile1);
                 Exec_PowerUp();
             }
-        }
-*/
 
-// Enter low power mode.
-    //sei();
-        //set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-        //sleep_mode();
-    //cli();
+        }
+ /*
+ // Nie można wejść w tryb PWR_DOWN bo timery muszą działać.
+ // Dopszczalny jest tryb IDLE
+ */
+        set_sleep_mode(SLEEP_MODE_IDLE);
+        sleep_mode();
     }
 
 }
