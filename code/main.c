@@ -48,10 +48,10 @@ extern unsigned char* USI_Slave_register_buffer[];
 // timer2 - zegar mierzący po jakim okresie włączyć zasilanie
 // timer3 - zegar mierzący czas zwłoki po jakim WDG się aktywuje
 
-#define WDG_DEFAULT_TIMER0   (unsigned int) 5
-#define WDG_DEFAULT_TIMER1   (unsigned int) 2
-#define WDG_DEFAULT_TIMER2   (unsigned int) 120 // 6 hrs
-#define WDG_DEFAULT_TIMER3   (unsigned int) 5
+#define WDG_DEFAULT_TIMER0   (unsigned int) 60
+#define WDG_DEFAULT_TIMER1   (unsigned int) 5
+#define WDG_DEFAULT_TIMER2   (unsigned int) 21600 // 6 hrs
+#define WDG_DEFAULT_TIMER3   (unsigned int) 600
 
 #define WDG_O5V_Line  PB3
 #define WDG_O3V_Line  PB4
@@ -64,8 +64,8 @@ volatile unsigned int WDG_REG_TIMER1;
 volatile unsigned int WDG_REG_TIMER2;
 volatile unsigned int WDG_REG_TIMER3;
 
-unsigned short int timer0, timer1;
-unsigned int timer2, timer3, timer4;
+unsigned short int timer0, timer1, timer4;
+unsigned int timer2, timer3;
 unsigned short int counter0;
 
 
@@ -143,7 +143,7 @@ void Timer0_Setup(void){
 void setup() {
   	cli();
 	DDRB  = 0b00011010; //
-	PORTB = 0b00010101; // internal pull-ups off
+	PORTB = 0b00000101; // internal pull-ups off
     USI_I2C_Init(0x22);
 
     USI_Slave_register_buffer[0] = (unsigned char*)(&WDG_REG_COMMAND);
@@ -173,15 +173,14 @@ void setup() {
 int LedOn;
 int LedTimer;
 
-unsigned int LedProfile4[8] = {10,500,10,500,10,500,10,500};
-unsigned int LedProfile1[8] = {1,99,1,99,1,99,1,99};
-unsigned int LedProfile2[8] = {2,10,2,10,1,1,1,78};
-unsigned int LedProfile3[8] = {3,3,3,3,3,3,3,3};
-
-unsigned int* LedProfile;
+short int LedProfile1[8] = {1,99,1,99,1,99,1,99};
+short int LedProfile2[8] = {1,10,1,78,1,10,1,78};
+short int LedProfile3[8] = {3,7,3,7,3,7,3,7};
+short int LedProfile4[8] = {2,298,2,298,2,298,2,298};
+short int* LedProfile;
 short int LedIndex;
 
-void LedStartProfile(unsigned int *params) {
+void LedStartProfile(short int *params) {
     LedOn = 0;
     LedIndex = 0;
     LedProfile = params;
@@ -230,19 +229,23 @@ ISR(TIMER1_COMPA_vect) {
     if (timer2 > 0 ) {timer2--;};
     if (timer3 > 0 ) {timer3--;};
     if (timer4 > 0 ) {timer4--;};
-
-    if ( ( timer4 == 0 ) && ( counter0 < 3 ) ) {
-        counter0 = 0;
-    }
 }
 
 
+void Exec_Line5_Down(void) { PORTB |= (1 << WDG_O5V_Line); }
+void Exec_Line3_Down(void) { PORTB |= (1 << WDG_O3V_Line); }
+void Exec_Line5_Up(void) { PORTB &= ~(1 << WDG_O5V_Line); }
+void Exec_Line3_Up(void) { PORTB &= ~(1 << WDG_O3V_Line); }
 
 void Exec_PowerDown(void) {
+ //   Exec_Line3_Down();
+ //   Exec_Line5_Down();
      PORTB &= ~(1 << PB4);
 }
 
 void Exec_PowerUp(void) {
+ //   Exec_Line3_Up();
+ //   Exec_Line5_Up();
      PORTB |= (1 << PB4);
 }
 
@@ -276,9 +279,7 @@ unsigned char EEPROM_read(unsigned char ucAddress) {
 int main(void) {
 
     int command;
-
     setup();
-    Exec_PowerUp();
     Timer0_Setup();
     Timer1_Setup();
     LedStartProfile(LedProfile1);
@@ -293,11 +294,18 @@ int main(void) {
                     timer3 = 0;
                     timer0 = WDG_REG_TIMER0;
                     WDG_REG_STATUS |= WDG_STATUS_ACTIVE;
-                    LedStartProfile(LedProfile2);
                     break;
 
                 case WDG_CMD_KEEPALIVE:
                     timer0 = WDG_REG_TIMER0;
+                    break;
+
+                case WDG_CMD_LINE3_ON:
+                    Exec_Line3_Up();
+                    break;
+
+                case WDG_CMD_LINE3_OFF:
+                    Exec_Line3_Down();
                     break;
 
             }
@@ -309,13 +317,11 @@ int main(void) {
 // Jeśli tak, to po wyzerowaniu timer3 ustaw status ACTIVE.
 // Od tego momentu, zerowanie timer0 będzie powodowało restart.
 */
-        if ( ( ( WDG_REG_STATUS & WDG_STATUS_ACTIVE ) != WDG_STATUS_ACTIVE )  /*&&
-             ( ( WDG_REG_STATUS & WDG_STATUS_POWEROFF ) != WDG_STATUS_POWEROFF )*/ ) {
+        if ( ( WDG_REG_STATUS & WDG_STATUS_ACTIVE ) != WDG_STATUS_ACTIVE ) {
             if ( timer3 == 0 ) {
-                WDG_REG_STATUS |= WDG_STATUS_ACTIVE;
                 timer0 = WDG_REG_TIMER0;
                 LedStartProfile(LedProfile2);
-                //PORTB ^= (1 << PB3 );
+                WDG_REG_STATUS |= WDG_STATUS_ACTIVE;
             }
         }
 /*
@@ -323,44 +329,20 @@ int main(void) {
 // Jeśli tak to REBOOT, wyłacz MOSFETy i zacznij odliczać czas w timer1
 */
 
-// BUG - Status ACTIVE and NOT REBOOTING and NOT POWER OFF
+// BUG - Status ACTIVE and NOT REBOOTING
 
         if ( ( ( WDG_REG_STATUS & WDG_STATUS_ACTIVE ) == WDG_STATUS_ACTIVE ) &&
-           ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) != WDG_STATUS_REBOOTING ) &&
-           ( ( WDG_REG_STATUS & WDG_STATUS_POWEROFF )  != WDG_STATUS_POWEROFF) ) {
+           ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) != WDG_STATUS_REBOOTING ) ) {
             if ( timer0 == 0 ) {
-
-/*
-    To powinno zostać przepisane na inną strukturę.
-    Główny warunek do sprawdzenia to liczba restartów.
-    Jeżeli mniej niż 3 to REBOOT else POWEROFF
-
-*/
-
-
-                WDG_REG_STATUS |= WDG_STATUS_REBOOTING;
                 timer1 = WDG_REG_TIMER1;
                 LedStartProfile(LedProfile3);
+                WDG_REG_STATUS |= WDG_STATUS_REBOOTING;
 				Exec_PowerDown();
-				if ( counter0 == 0 ) {
-                    timer4 = 90; // 30 min. x 60 sec.
-                    counter0 = 1;
-				} else {
-				    counter0++;
-				    if  ( ( counter0 > 3 )  &&
-                        ( ( WDG_REG_STATUS & WDG_STATUS_POWEROFF ) != WDG_STATUS_POWEROFF ) ) {
-                        LedStartProfile(LedProfile4);
-                        //Exec_PowerDown();
-                        WDG_REG_STATUS |= WDG_STATUS_POWEROFF;
-                        WDG_REG_STATUS &= ~(WDG_STATUS_REBOOTING);
-                        timer2 = WDG_DEFAULT_TIMER2;
-                        counter0 = 0;
-
-				    }
-
+				if ( timer4 == 0 ) {
+                    timer4 = 1800; // 30 min. x 60 sec.
+                    counter0 = 0;
 				}
-
-				//counter0++;
+				counter0++;
 			}
         }
 /*
@@ -371,12 +353,11 @@ int main(void) {
 */
         if ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) == WDG_STATUS_REBOOTING ) {
             if ( timer1 == 0 ) {
-                WDG_REG_STATUS &= ~(WDG_STATUS_REBOOTING | WDG_STATUS_ACTIVE);
                 timer3 = WDG_REG_TIMER3;
                 // przejście do stanu jak po pierwszym uruchomieniu
                 LedStartProfile(LedProfile1);
+                WDG_REG_STATUS &= ~(WDG_STATUS_REBOOTING | WDG_STATUS_ACTIVE);
                 Exec_PowerUp();
-                PORTB ^= (1 << PB3 );
             }
         }
 /*
@@ -384,21 +365,12 @@ int main(void) {
 // to wyłącz zasilanie na kilka godzin (dzień?).
 // Nie ma sensu wachlować zasilaniem jak RPi nie wstaje.
 */
-//        if ( ( timer4 > 0 ) &&
-/*
-        if ( ( timer4 == 0 ) &&
-             ( counter0 >= 3 ) &&
-             ( ( WDG_REG_STATUS & WDG_STATUS_POWEROFF ) != WDG_STATUS_POWEROFF )  &&
-             ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) != WDG_STATUS_REBOOTING ) )
-        {
+        if ( ( timer4 > 0 ) && ( counter0 >= 3 ) ) {
             LedStartProfile(LedProfile4);
             Exec_PowerDown();
-            WDG_REG_STATUS |= WDG_STATUS_POWEROFF;
+            WDG_REG_STATUS = WDG_STATUS_POWEROFF;
             timer2 = WDG_DEFAULT_TIMER2;
-            counter0 = 0;
         }
-
-*/
 /*
 // Wyjście z trybu POWEROFF
 // Tak, wiem, warunki nie są napisane w c++ style, ale tak ma być
