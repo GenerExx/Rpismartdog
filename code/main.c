@@ -21,7 +21,7 @@
 #define F_CPU 1000000UL
 
 #include <avr/io.h>
-#include <util/delay.h>
+//#include <util/delay.h>
 #include <avr/sleep.h>
 #include <avr/power.h>
 #include "usi_i2c_slave.h"
@@ -37,8 +37,6 @@ extern unsigned char* USI_Slave_register_buffer[];
 #define WDG_CMD_NOP             0x00
 #define WDG_CMD_BOOTCOMPLETE    0x01
 #define WDG_CMD_KEEPALIVE       0x02
-#define WDG_CMD_LINE3_OFF       0x03
-#define WDG_CMD_LINE3_ON        0x04
 #define WDG_CMD_STORE           0x05
 #define WDG_CMD_LOAD            0x06
 
@@ -48,10 +46,18 @@ extern unsigned char* USI_Slave_register_buffer[];
 // timer2 - zegar mierzący po jakim okresie włączyć zasilanie
 // timer3 - zegar mierzący czas zwłoki po jakim WDG się aktywuje
 
-#define WDG_DEFAULT_TIMER0   (unsigned int) 60
-#define WDG_DEFAULT_TIMER1   (unsigned int) 5
-#define WDG_DEFAULT_TIMER2   (unsigned int) 21600 // 6 hrs
-#define WDG_DEFAULT_TIMER3   (unsigned int) 600
+/*
+#define WDG_DEFAULT_TIMER0   (unsigned short int) 120
+#define WDG_DEFAULT_TIMER1   (unsigned short int) 5
+#define WDG_DEFAULT_TIMER2   (unsigned int) 7200 // 6 hrs
+#define WDG_DEFAULT_TIMER3   (unsigned int) 360
+*/
+
+#define WDG_DEFAULT_TIMER0   (unsigned short int) 120
+#define WDG_DEFAULT_TIMER1   (unsigned short int) 4
+#define WDG_DEFAULT_TIMER2   (unsigned int) 7200// 6 hrs
+#define WDG_DEFAULT_TIMER3   (unsigned int) 360
+
 
 #define WDG_O5V_Line  PB3
 #define WDG_O3V_Line  PB4
@@ -59,25 +65,17 @@ extern unsigned char* USI_Slave_register_buffer[];
 
 volatile short int WDG_REG_COMMAND;
 volatile short int WDG_REG_STATUS;
-volatile unsigned int WDG_REG_TIMER0;
-volatile unsigned int WDG_REG_TIMER1;
+volatile unsigned short int WDG_REG_TIMER0;
+volatile unsigned short int WDG_REG_TIMER1;
 volatile unsigned int WDG_REG_TIMER2;
 volatile unsigned int WDG_REG_TIMER3;
 
-unsigned short int timer0, timer1, timer4;
-unsigned int timer2, timer3;
+unsigned short int timer0, timer1;
+unsigned int timer2, timer3, timer4;
 unsigned short int counter0;
 
 
-void Load_Defaults(void) {
 
-
-}
-
-void Store_Defaults(void) {
-
-
-}
 
 void Timer0_Setup(void){
     cli();
@@ -143,7 +141,7 @@ void Timer0_Setup(void){
 void setup() {
   	cli();
 	DDRB  = 0b00011010; //
-	PORTB = 0b00000101; // internal pull-ups off
+	PORTB = 0b00010101; // internal pull-ups off
     USI_I2C_Init(0x22);
 
     USI_Slave_register_buffer[0] = (unsigned char*)(&WDG_REG_COMMAND);
@@ -173,14 +171,23 @@ void setup() {
 int LedOn;
 int LedTimer;
 
-short int LedProfile1[8] = {1,99,1,99,1,99,1,99};
-short int LedProfile2[8] = {1,10,1,78,1,10,1,78};
-short int LedProfile3[8] = {3,7,3,7,3,7,3,7};
-short int LedProfile4[8] = {2,298,2,298,2,298,2,298};
-short int* LedProfile;
+/*
+unsigned int LedProfile4[8] = {10,500,10,500,10,500,10,500};
+unsigned int LedProfile1[8] = {1,99,1,99,1,99,1,99};
+unsigned int LedProfile2[8] = {2,10,2,10,1,1,1,78};
+unsigned int LedProfile3[8] = {3,3,3,3,3,3,3,3};
+*/
+
+unsigned int LedProfile4[4] = {10,500,10,500};
+unsigned int LedProfile1[4] = {1,99,1,99};
+unsigned int LedProfile2[4] = {2,10,2,76};
+unsigned int LedProfile3[4] = {3,3,3,3};
+
+
+unsigned int* LedProfile;
 short int LedIndex;
 
-void LedStartProfile(short int *params) {
+void LedStartProfile(unsigned int *params) {
     LedOn = 0;
     LedIndex = 0;
     LedProfile = params;
@@ -191,7 +198,7 @@ ISR (TIMER0_COMPA_vect) {
     if (LedTimer == 0){
 
         LedTimer = LedProfile[LedIndex];
-        LedIndex = ( LedIndex + 1 ) % 8;
+        LedIndex = (( LedIndex + 1 ) & 0x03);
         LedOn = 1 - LedOn;
 
         if ( LedOn == 1 ) {
@@ -229,23 +236,19 @@ ISR(TIMER1_COMPA_vect) {
     if (timer2 > 0 ) {timer2--;};
     if (timer3 > 0 ) {timer3--;};
     if (timer4 > 0 ) {timer4--;};
+
+    if ( ( timer4 == 0 ) && ( counter0 < 3 ) ) {
+        counter0 = 0;
+    }
 }
 
 
-void Exec_Line5_Down(void) { PORTB |= (1 << WDG_O5V_Line); }
-void Exec_Line3_Down(void) { PORTB |= (1 << WDG_O3V_Line); }
-void Exec_Line5_Up(void) { PORTB &= ~(1 << WDG_O5V_Line); }
-void Exec_Line3_Up(void) { PORTB &= ~(1 << WDG_O3V_Line); }
 
 void Exec_PowerDown(void) {
- //   Exec_Line3_Down();
- //   Exec_Line5_Down();
      PORTB &= ~(1 << PB4);
 }
 
 void Exec_PowerUp(void) {
- //   Exec_Line3_Up();
- //   Exec_Line5_Up();
      PORTB |= (1 << PB4);
 }
 
@@ -279,7 +282,9 @@ unsigned char EEPROM_read(unsigned char ucAddress) {
 int main(void) {
 
     int command;
+    unsigned short int lo,hi;
     setup();
+    Exec_PowerUp();
     Timer0_Setup();
     Timer1_Setup();
     LedStartProfile(LedProfile1);
@@ -294,18 +299,33 @@ int main(void) {
                     timer3 = 0;
                     timer0 = WDG_REG_TIMER0;
                     WDG_REG_STATUS |= WDG_STATUS_ACTIVE;
+                    LedStartProfile(LedProfile2);
                     break;
 
                 case WDG_CMD_KEEPALIVE:
                     timer0 = WDG_REG_TIMER0;
                     break;
 
-                case WDG_CMD_LINE3_ON:
-                    Exec_Line3_Up();
+                case WDG_CMD_STORE:
+                    EEPROM_write(0, WDG_REG_TIMER0);
+                    EEPROM_write(1, WDG_REG_TIMER1);
+                    EEPROM_write(2, ( WDG_REG_TIMER2 & 0xFF ) );
+                    EEPROM_write(3, ( ( WDG_REG_TIMER2>>8 ) & 0xFF ) );
+                    EEPROM_write(4, ( WDG_REG_TIMER3 & 0xFF ) );
+                    EEPROM_write(5, ( ( WDG_REG_TIMER3>>8 ) & 0xFF ) );
                     break;
 
-                case WDG_CMD_LINE3_OFF:
-                    Exec_Line3_Down();
+                case WDG_CMD_LOAD:
+
+                    WDG_REG_TIMER0 = EEPROM_read(0);
+                    WDG_REG_TIMER1 = EEPROM_read(1);
+                    lo = EEPROM_read(2);
+                    hi = EEPROM_read(3);
+                    WDG_REG_TIMER2 = (hi << 8) | ( lo  & 0x00FF );
+                    lo = EEPROM_read(4);
+                    hi = EEPROM_read(5);
+                    WDG_REG_TIMER3 = (hi << 8) | ( lo  & 0x00FF );
+
                     break;
 
             }
@@ -317,11 +337,12 @@ int main(void) {
 // Jeśli tak, to po wyzerowaniu timer3 ustaw status ACTIVE.
 // Od tego momentu, zerowanie timer0 będzie powodowało restart.
 */
-        if ( ( WDG_REG_STATUS & WDG_STATUS_ACTIVE ) != WDG_STATUS_ACTIVE ) {
+        if ( ( ( WDG_REG_STATUS & WDG_STATUS_ACTIVE ) != WDG_STATUS_ACTIVE )  /*&&
+             ( ( WDG_REG_STATUS & WDG_STATUS_POWEROFF ) != WDG_STATUS_POWEROFF )*/ ) {
             if ( timer3 == 0 ) {
+                WDG_REG_STATUS |= WDG_STATUS_ACTIVE;
                 timer0 = WDG_REG_TIMER0;
                 LedStartProfile(LedProfile2);
-                WDG_REG_STATUS |= WDG_STATUS_ACTIVE;
             }
         }
 /*
@@ -329,21 +350,25 @@ int main(void) {
 // Jeśli tak to REBOOT, wyłacz MOSFETy i zacznij odliczać czas w timer1
 */
 
-// BUG - Status ACTIVE and NOT REBOOTING
-
         if ( ( ( WDG_REG_STATUS & WDG_STATUS_ACTIVE ) == WDG_STATUS_ACTIVE ) &&
-           ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) != WDG_STATUS_REBOOTING ) ) {
+           ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) != WDG_STATUS_REBOOTING ) &&
+           ( ( WDG_REG_STATUS & WDG_STATUS_POWEROFF )  != WDG_STATUS_POWEROFF) ) {
             if ( timer0 == 0 ) {
-                timer1 = WDG_REG_TIMER1;
-                LedStartProfile(LedProfile3);
-                WDG_REG_STATUS |= WDG_STATUS_REBOOTING;
-				Exec_PowerDown();
-				if ( timer4 == 0 ) {
-                    timer4 = 1800; // 30 min. x 60 sec.
+                if ( counter0 <= 3) {
+                    WDG_REG_STATUS |= WDG_STATUS_REBOOTING;
+                    LedStartProfile(LedProfile3);
+                    Exec_PowerDown();
+                    if ( counter0 == 0 ) { timer4 = 1800; }
+                    counter0++;
+                    timer1 = WDG_REG_TIMER1;
+                } else {
+                    WDG_REG_STATUS |= WDG_STATUS_POWEROFF;
+                    LedStartProfile(LedProfile4);
+                    Exec_PowerDown();
+                    timer2 = WDG_REG_TIMER2;
                     counter0 = 0;
-				}
-				counter0++;
-			}
+                }
+            }
         }
 /*
 // Jeżeli mamy status REBOOTING to czekamy aż timer1 się wyzeruje
@@ -353,23 +378,12 @@ int main(void) {
 */
         if ( ( WDG_REG_STATUS & WDG_STATUS_REBOOTING ) == WDG_STATUS_REBOOTING ) {
             if ( timer1 == 0 ) {
+                WDG_REG_STATUS &= ~(WDG_STATUS_REBOOTING | WDG_STATUS_ACTIVE);
                 timer3 = WDG_REG_TIMER3;
                 // przejście do stanu jak po pierwszym uruchomieniu
                 LedStartProfile(LedProfile1);
-                WDG_REG_STATUS &= ~(WDG_STATUS_REBOOTING | WDG_STATUS_ACTIVE);
                 Exec_PowerUp();
             }
-        }
-/*
-// Jeżeli w czasie odliczania timer4 liczba restartów jest większa od 4
-// to wyłącz zasilanie na kilka godzin (dzień?).
-// Nie ma sensu wachlować zasilaniem jak RPi nie wstaje.
-*/
-        if ( ( timer4 > 0 ) && ( counter0 >= 3 ) ) {
-            LedStartProfile(LedProfile4);
-            Exec_PowerDown();
-            WDG_REG_STATUS = WDG_STATUS_POWEROFF;
-            timer2 = WDG_DEFAULT_TIMER2;
         }
 /*
 // Wyjście z trybu POWEROFF

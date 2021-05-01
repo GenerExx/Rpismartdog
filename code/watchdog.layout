@@ -7,14 +7,14 @@
 			<Cursor1 position="2229" topLine="32" />
 		</Cursor>
 	</File>
-	<File name="main.c" open="1" top="1" tabpos="1" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="1645" topLine="35" />
-		</Cursor>
-	</File>
 	<File name="usi_i2c_slave.c" open="1" top="0" tabpos="2" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="6485" topLine="113" />
+			<Cursor1 position="1405" topLine="0" />
+		</Cursor>
+	</File>
+	<File name="main.c" open="1" top="1" tabpos="1" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="6069" topLine="246" />
 		</Cursor>
 	</File>
 </CodeBlocks_layout_file>
