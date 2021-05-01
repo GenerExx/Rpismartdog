@@ -9,8 +9,8 @@
  //
  //                   +-\/-+
  //      reset  PB5  1|    |8  VCC
- //       O5V   PB3  2|    |7  PB2  SCL
- //       O3V   PB4  3|    |6  PB1  LED
+ // signal in   PB3  2|    |7  PB2  SCL
+ // power  out  PB4  3|    |6  PB1  LED
  //             GND  4|    |5  PB0  SDA
  //                   +----+
  //
@@ -76,6 +76,14 @@ unsigned short int counter0;
 
 
 
+void Signal_Setup(void) {
+    cli();
+    GIMSK |= (1 << PCIE );
+    MCUCR |= ( ( 1 << ISC01 ) | ( 1 << ISC00 ) );
+    PCMSK |= (1 << PCINT3);
+    sei();
+}
+
 
 void Timer0_Setup(void){
     cli();
@@ -140,8 +148,8 @@ void Timer0_Setup(void){
 */
 void setup() {
   	cli();
-	DDRB  = 0b00011010; //
-	PORTB = 0b00010101; // internal pull-ups off
+	DDRB  = 0b00010010; //
+	PORTB = 0b00011101; // internal pull-ups off
     USI_I2C_Init(0x22);
 
     USI_Slave_register_buffer[0] = (unsigned char*)(&WDG_REG_COMMAND);
@@ -243,6 +251,12 @@ ISR(TIMER1_COMPA_vect) {
 }
 
 
+ISR(PCINT0_vect) {
+
+    timer0 = WDG_REG_TIMER0;
+
+}
+
 
 void Exec_PowerDown(void) {
      PORTB &= ~(1 << PB4);
@@ -287,6 +301,7 @@ int main(void) {
     Exec_PowerUp();
     Timer0_Setup();
     Timer1_Setup();
+    Signal_Setup();
     LedStartProfile(LedProfile1);
 
     while (1) {
